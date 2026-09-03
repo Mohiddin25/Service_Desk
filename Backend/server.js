@@ -1,11 +1,18 @@
 import express from "express";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
+import cookieParser from "cookie-parser";
+import authRoutes from "./api/authRoutes.js";
 
-const app=express();
+const app = express();
 dotenv.config();
 
 app.use(express.json());
+app.use(cookieParser());
+
+// Auth API Routes
+app.use("/api/auth", authRoutes);
+
 
 
 const connectDB = async () => {
