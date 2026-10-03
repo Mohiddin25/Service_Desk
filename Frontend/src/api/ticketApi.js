@@ -1,12 +1,6 @@
-// Centralized Ticket Management API Service
-const API_BASE = '/api';
+import { API_BASE, getAuthHeaders } from './config';
 
-const getHeaders = () => {
-  const token = localStorage.getItem('servicedesk_token');
-  const headers = { 'Content-Type': 'application/json' };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-  return headers;
-};
+const getHeaders = () => getAuthHeaders();
 
 // Initial realistic dataset for enterprise demonstration if offline
 let mockTickets = [
@@ -150,7 +144,8 @@ export const ticketApi = {
       if (params.limit) query.append('limit', params.limit || 50);
 
       const res = await fetch(`${API_BASE}/tickets?${query.toString()}`, {
-        headers: getHeaders()
+        headers: getHeaders(),
+        credentials: 'include'
       });
       if (res.ok) {
         const data = await res.json();
@@ -190,7 +185,8 @@ export const ticketApi = {
   getById: async (id) => {
     try {
       const res = await fetch(`${API_BASE}/tickets/${id}`, {
-        headers: getHeaders()
+        headers: getHeaders(),
+        credentials: 'include'
       });
       if (res.ok) return await res.json();
     } catch (e) {}
@@ -202,6 +198,7 @@ export const ticketApi = {
       const res = await fetch(`${API_BASE}/tickets`, {
         method: 'POST',
         headers: getHeaders(),
+        credentials: 'include',
         body: JSON.stringify({
           title: ticketData.title,
           description: ticketData.description,
@@ -238,6 +235,7 @@ export const ticketApi = {
       const res = await fetch(`${API_BASE}/tickets/${id}/status`, {
         method: 'PATCH',
         headers: getHeaders(),
+        credentials: 'include',
         body: JSON.stringify({ status })
       });
       if (res.ok) return await res.json();
@@ -262,6 +260,7 @@ export const ticketApi = {
       const res = await fetch(`${API_BASE}/tickets/${id}/assign`, {
         method: 'PATCH',
         headers: getHeaders(),
+        credentials: 'include',
         body: JSON.stringify({ technicianId })
       });
       if (res.ok) return await res.json();
@@ -284,7 +283,8 @@ export const ticketApi = {
   getComments: async (id) => {
     try {
       const res = await fetch(`${API_BASE}/tickets/${id}/comments`, {
-        headers: getHeaders()
+        headers: getHeaders(),
+        credentials: 'include'
       });
       if (res.ok) return await res.json();
     } catch (e) {}
@@ -296,6 +296,7 @@ export const ticketApi = {
       const res = await fetch(`${API_BASE}/tickets/${id}/comments`, {
         method: 'POST',
         headers: getHeaders(),
+        credentials: 'include',
         body: JSON.stringify({ message, isInternal })
       });
       if (res.ok) return await res.json();

@@ -1,5 +1,5 @@
 // Centralized Auth API Service
-const API_BASE = '/api';
+import { API_BASE } from './config';
 
 export const authApi = {
   login: async ({ email, password }) => {
@@ -7,6 +7,7 @@ export const authApi = {
       const res = await fetch(`${API_BASE}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ email, password })
       });
       if (res.ok) {
@@ -71,7 +72,10 @@ export const authApi = {
 
   logout: async () => {
     try {
-      await fetch(`${API_BASE}/auth/logout`, { method: 'POST' });
+      await fetch(`${API_BASE}/auth/logout`, {
+        method: 'POST',
+        credentials: 'include'
+      });
     } catch (e) {
       // Backend may be offline
     }
@@ -81,7 +85,8 @@ export const authApi = {
   getProfile: async (token) => {
     try {
       const res = await fetch(`${API_BASE}/auth/profile`, {
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+        credentials: 'include'
       });
       if (res.ok) return await res.json();
     } catch (e) {}
@@ -90,7 +95,9 @@ export const authApi = {
 
   getDepartments: async () => {
     try {
-      const res = await fetch(`${API_BASE}/auth/departments`);
+      const res = await fetch(`${API_BASE}/auth/departments`, {
+        credentials: 'include'
+      });
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data) && data.length > 0) return data;
@@ -113,6 +120,7 @@ export const authApi = {
     const res = await fetch(`${API_BASE}/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify(userData)
     });
     const data = await res.json().catch(() => ({}));
