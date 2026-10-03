@@ -1,8 +1,8 @@
+import mongoose from "mongoose";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import User from "../models/userModel.js";
 import Department from "../models/departmentModel.js";
-
 
 // Helper function to generate JWT
 const generateToken = (id) => {
@@ -49,8 +49,85 @@ const ALLOWED_ROLES = [
   "asset_manager",
 ];
 
+// Helper to resolve or create a valid department ObjectId
+const resolveDepartmentId = async (deptInput) => {
+  if (!deptInput) return null;
+  const trimmed = typeof deptInput === "string" ? deptInput.trim() : "";
+  if (!trimmed || trimmed === "none") return null;
+
+  // 1. If it's already a valid ObjectId, verify if it exists
+  if (mongoose.Types.ObjectId.isValid(trimmed)) {
+    const existingById = await Department.findById(trimmed);
+    if (existingById) return existingById._id;
+  }
+
+  // 2. Find by name case-insensitive
+  const existingByName = await Department.findOne({
+    name: { $regex: new RegExp(`^${trimmed}$`, "i") },
+  });
+
+  if (existingByName) {
+    return existingByName._id;
+  }
+
+  // 3. If department does not exist yet, auto-create it so userModel reference remains valid
+  try {
+    const createdDept = await Department.create({
+      name: trimmed,
+      description: `${trimmed} Department`,
+    });
+    return createdDept._id;
+  } catch (err) {
+    console.warn("Could not create department dynamically:", err.message);
+    return null;
+  }
+};
+
 /**
- * @desc    Register a new user with specified role & set HTTP-only cookie (no token in body)
+ * @desc    Get public active departments list for registration & onboarding
+ * @route   GET /api/auth/departments
+ * @access  Public
+ */
+export const getPublicDepartments = async (req, res) => {
+  try {
+    let departments = await Department.find({ isActive: { $ne: false } })
+      .select("name description _id")
+      .sort({ name: 1 });
+
+    if (!departments || departments.length === 0) {
+      const defaultNames = [
+        "Product & Engineering",
+        "IT Operations",
+        "Human Resources",
+        "Finance & Operations",
+        "Customer Support",
+        "Security & Compliance",
+      ];
+
+      departments = await Promise.all(
+        defaultNames.map(async (name) => {
+          let dept = await Department.findOne({ name });
+          if (!dept) {
+            dept = await Department.create({
+              name,
+              description: `${name} Department`,
+              isActive: true,
+            });
+          }
+          return dept;
+        })
+      );
+    }
+
+    return res.json(departments);
+  } catch (error) {
+    console.error("Fetch Departments Error:", error);
+    return res.status(500).json({ message: "Failed to fetch departments" });
+  }
+};
+
+/**
+ * @desc    Register a new user with specified role & set HTTP-only cookie
  * @route   POST /api/auth/register
  * @access  Public
  */
@@ -62,6 +139,12 @@ export const registerUser = async (req, res) => {
       return res.status(400).json({ message: "Please provide name, email, and password" });
     }
 
+    if (password.length < 6) {
+      return res.status(400).json({ message: "Password must be at least 6 characters long" });
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+
     // Validate role if specified
     if (role && !ALLOWED_ROLES.includes(role)) {
       return res.status(400).json({
@@ -70,10 +153,13 @@ export const registerUser = async (req, res) => {
     }
 
     // Check if user already exists
-    const userExists = await User.findOne({ email: email.toLowerCase() });
+    const userExists = await User.findOne({ email: normalizedEmail });
     if (userExists) {
       return res.status(400).json({ message: "User with this email already exists" });
     }
+
+    // Safely resolve department to a Department ObjectId (or null)
+    const departmentId = await resolveDepartmentId(department);
 
     // Hash password directly in controller
     const salt = await bcrypt.genSalt(10);
@@ -81,15 +167,19 @@ export const registerUser = async (req, res) => {
 
     // Create user with hashed password
     const user = await User.create({
-      name,
-      email: email.toLowerCase(),
+      name: name.trim(),
+      email: normalizedEmail,
       password: hashedPassword,
       role: role || "employee",
-      department: department || null,
+      department: departmentId,
     });
 
     if (user) {
-      sendTokenResponse(user, 201, res, false);
+      const populatedUser = await User.findById(user._id)
+        .select("-password")
+        .populate("department", "name description");
+
+      sendTokenResponse(populatedUser, 201, res, true);
     } else {
       return res.status(400).json({ message: "Invalid user data" });
     }
@@ -114,7 +204,7 @@ export const loginUser = async (req, res) => {
     }
 
     // Check for user email
-    const user = await User.findOne({ email: email.toLowerCase() });
+    const user = await User.findOne({ email: email.toLowerCase().trim() });
 
     // Compare password directly using bcrypt in login route controller
     const isPasswordMatch = user ? await bcrypt.compare(password, user.password) : false;
@@ -124,7 +214,11 @@ export const loginUser = async (req, res) => {
         return res.status(403).json({ message: "Account is deactivated. Please contact administrator." });
       }
 
-      sendTokenResponse(user, 200, res);
+      const populatedUser = await User.findById(user._id)
+        .select("-password")
+        .populate("department", "name description");
+
+      sendTokenResponse(populatedUser, 200, res);
     } else {
       return res.status(401).json({ message: "Invalid email or password" });
     }
