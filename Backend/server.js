@@ -24,25 +24,24 @@ const allowedOrigins = [
 
 const corsOptions = {
   origin: (origin, callback) => {
-    // Allow non-browser requests or same-origin requests (curl, Postman, server-to-server)
     if (!origin) return callback(null, true);
 
     const cleanOrigin = origin.replace(/\/$/, "");
+
     if (
       allowedOrigins.includes(cleanOrigin) ||
-      /\.vercel\.app$/.test(cleanOrigin) ||
-      cleanOrigin.includes("localhost") ||
-      cleanOrigin.includes("127.0.0.1") ||
-      (process.env.FRONTEND_URL && cleanOrigin === process.env.FRONTEND_URL.replace(/\/$/, "")) ||
-      (process.env.CLIENT_URL && cleanOrigin === process.env.CLIENT_URL.replace(/\/$/, ""))
+      /\.vercel\.app$/.test(cleanOrigin)
     ) {
       return callback(null, true);
     }
-    // Permissive fallback reflecting request origin for ease of development & preview deployments
-    return callback(null, true);
+
+    return callback(new Error("Not allowed by CORS"));
   },
+
   credentials: true,
+
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+
   allowedHeaders: [
     "Origin",
     "X-Requested-With",
@@ -50,13 +49,11 @@ const corsOptions = {
     "Accept",
     "Authorization",
   ],
+
   optionsSuccessStatus: 204,
 };
 
 app.use(cors(corsOptions));
-app.options("*", cors(corsOptions));
-
-app.use(cors({ origin: 'https://service-desk-puce.vercel.app', credentials: true }));
 app.use(cookieParser());
 
 // Root and Health Check Endpoints
